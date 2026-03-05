@@ -1,0 +1,29 @@
+# Audible auth tokens — never commit these
+auth/
+
+# All script output (covers and library.json live here)
+output/
+
+# Environment variables
+.env
+
+# Python cache and build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+*.swp
