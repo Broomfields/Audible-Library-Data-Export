@@ -5,9 +5,7 @@ Personal scripts for exporting Audible library metadata — book titles, authors
 ## What it does
 
 - **`auth.py`** — One-time setup. Opens an Amazon browser login so you can authorise the app. Your Amazon password is entered only in your browser and never touches these scripts or the project files. The resulting auth file holds OAuth tokens only.
-- **`fetch_library.py`** — Fetches your complete Audible library and exports:
-  - `output/library.json` — full metadata for every book
-  - `output/covers/` — cover images (one JPEG per book, named by ASIN)
+- **`fetch_library.py`** — Fetches your complete Audible library and writes `output/library.json`. Optional flags enable cover/PDF downloads and additional metadata fields.
 
 ## Prerequisites
 
@@ -53,15 +51,24 @@ You only need to run this once unless your tokens expire or you switch accounts.
 ### Step 2 — Export your library
 
 ```bash
-python fetch_library.py           # fetch metadata and download covers
-python fetch_library.py --no-covers  # fetch metadata only, skip image downloads
+python fetch_library.py                   # catalog only (fastest)
+python fetch_library.py --covers          # + download cover images
+python fetch_library.py --pdfs            # + download companion PDFs
+python fetch_library.py --extended        # + subtitle, description, publisher, runtime, language, release date, rating
+python fetch_library.py --order-details   # + purchase date
+python fetch_library.py --stats           # + listening progress (percent complete, finished, position)
 ```
 
-This will:
+Flags can be combined freely:
+
+```bash
+python fetch_library.py --covers --extended --stats --order-details --pdfs
+```
+
+This will always:
 1. Load the saved auth tokens
 2. Fetch your library from the Audible API (paginated, handles 1 000+ books)
-3. Download cover images to `output/covers/`
-4. Write `output/library.json`
+3. Write `output/library.json`
 
 ## Output
 
@@ -69,7 +76,7 @@ All output is written to the `output/` directory, which is git-ignored so it nev
 
 ### `output/library.json`
 
-A JSON array where each entry looks like:
+Every book entry always contains these base fields:
 
 ```json
 {
@@ -83,17 +90,31 @@ A JSON array where each entry looks like:
   ],
   "categories": ["Science Fiction & Fantasy", "Fantasy"],
   "cover_url": "https://m.media-amazon.com/images/I/...",
-  "cover_local": "covers/B08G9PRS1K.jpg"
+  "pdf_url": null
 }
 ```
 
-`series` is an array of objects so books that belong to multiple series (e.g. a title that is part of both a sub-series and a wider universe) are fully represented. It will be an empty array for standalone books.
+`series` is an array of objects so books that belong to multiple series are fully represented. It will be an empty array for standalone books. `pdf_url` is `null` when Audible has no companion PDF for that title.
 
-`cover_local` is a path relative to `output/` pointing to the expected location of the downloaded cover image. It is always written when a `cover_url` is available, even if the image hasn't been downloaded yet — consumers should check that the file exists before using it. Other fields may be `null` or empty lists when the information isn't available from Audible.
+Additional keys are added by flag:
+
+| Flag | Keys added |
+|---|---|
+| `--covers` | `cover_local` — path relative to `output/` (e.g. `covers/B08G9PRS1K.jpg`) |
+| `--pdfs` | `pdf_local` — path relative to `output/` (e.g. `pdfs/B08G9PRS1K.pdf`) |
+| `--extended` | `subtitle`, `description`, `publisher`, `runtime_length_min`, `language`, `release_date`, `rating_avg`, `rating_count` |
+| `--order-details` | `purchase_date` |
+| `--stats` | `percent_complete`, `is_finished`, `listening_position_seconds` |
+
+Fields may be `null` when the information isn't available from Audible for a particular title.
 
 ### `output/covers/`
 
-One image file per book, named `{ASIN}.jpg`. Already-downloaded files are skipped on subsequent runs.
+Created by `--covers`. One image file per book, named `{ASIN}.jpg`. Already-downloaded files are skipped on subsequent runs.
+
+### `output/pdfs/`
+
+Created by `--pdfs`. One PDF per book that has a companion document, named `{ASIN}.pdf`. Already-downloaded files are skipped on subsequent runs.
 
 ### On ISBNs
 
@@ -146,4 +167,4 @@ The output is structured to be easy to ingest elsewhere — a reading tracker, a
 
 - `auth/audible_auth.json` contains **OAuth tokens only** — not your Amazon password.
 - The `auth/` directory is listed in `.gitignore` and will never be committed to version control.
-- The `output/` directory (covers and library.json) is git-ignored by default.
+- The `output/` directory (covers, PDFs, and library.json) is git-ignored by default.
