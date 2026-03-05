@@ -5,6 +5,7 @@ Reads the auth file created by auth.py, fetches all books from the Audible API,
 downloads cover images to output/covers/, and writes output/library.json.
 """
 
+import argparse
 import json
 import sys
 import time
@@ -81,11 +82,23 @@ def fetch_full_library(client: audible.Client) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Metadata extraction
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _names(entries: list[dict] | None) -> list[str]:
     return [e["name"] for e in (entries or []) if e.get("name")]
+
+
+def _cover_extension(url: str) -> str:
+    """Infer file extension from the URL path, defaulting to .jpg."""
+    path = urlparse(url).path
+    suffix = Path(path).suffix
+    return suffix if suffix else ".jpg"
+
+
+# ---------------------------------------------------------------------------
+# Metadata extraction
+# ---------------------------------------------------------------------------
 
 
 def extract_book(item: dict) -> dict:
@@ -118,13 +131,19 @@ def extract_book(item: dict) -> dict:
             if name and name not in categories:
                 categories.append(name)
 
-    # --- Cover image URL ---
+    # --- Cover image URL and local path ---
     cover_url: str | None = None
     product_images: dict = item.get("product_images") or {}
     for size in COVER_SIZES:
         if product_images.get(size):
             cover_url = product_images[size]
             break
+
+    # Relative to output/ (i.e. alongside library.json); present even if the
+    # image hasn't been downloaded yet — consumers should check file existence.
+    cover_local: str | None = None
+    if cover_url and asin:
+        cover_local = f"covers/{asin}{_cover_extension(cover_url)}"
 
     return {
         "asin": asin,
@@ -134,19 +153,13 @@ def extract_book(item: dict) -> dict:
         "series": series,
         "categories": categories,
         "cover_url": cover_url,
+        "cover_local": cover_local,
     }
 
 
 # ---------------------------------------------------------------------------
 # Cover image downloading
 # ---------------------------------------------------------------------------
-
-def _cover_extension(url: str) -> str:
-    """Infer file extension from the URL path, defaulting to .jpg."""
-    path = urlparse(url).path
-    suffix = Path(path).suffix
-    return suffix if suffix else ".jpg"
-
 
 def download_covers(books: list[dict]) -> None:
     """Download cover images into covers/, skipping files already on disk."""
@@ -157,12 +170,12 @@ def download_covers(books: list[dict]) -> None:
         for i, book in enumerate(books, 1):
             asin = book.get("asin")
             cover_url = book.get("cover_url")
+            cover_local = book.get("cover_local")
 
-            if not asin or not cover_url:
+            if not asin or not cover_url or not cover_local:
                 continue
 
-            ext = _cover_extension(cover_url)
-            dest = COVERS_DIR / f"{asin}{ext}"
+            dest = OUTPUT_DIR / cover_local  # e.g. output/covers/B123.jpg
 
             if dest.exists():
                 print(f"  [{i}/{total}] {asin} — already downloaded, skipping")
@@ -182,6 +195,16 @@ def download_covers(books: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Export your Audible library to JSON with cover images."
+    )
+    parser.add_argument(
+        "--no-covers",
+        action="store_true",
+        help="Skip downloading cover images (cover_url and cover_local are still written to the JSON).",
+    )
+    args = parser.parse_args()
+
     # Guard: require auth file
     if not AUTH_FILE.exists():
         print(f"Error: auth file not found at {AUTH_FILE}", file=sys.stderr)
@@ -203,9 +226,12 @@ def main() -> None:
     # Ensure output directory exists before writing anything
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Download covers
-    print(f"\nDownloading cover images to {COVERS_DIR}/…")
-    download_covers(books)
+    # Download covers (unless skipped)
+    if args.no_covers:
+        print("\nSkipping cover downloads (--no-covers).")
+    else:
+        print(f"\nDownloading cover images to {COVERS_DIR}/…")
+        download_covers(books)
 
     # Write JSON
     OUTPUT_FILE.write_text(
@@ -215,7 +241,8 @@ def main() -> None:
 
     print(f"\nDone.")
     print(f"  Library data : {OUTPUT_FILE}  ({len(books)} books)")
-    print(f"  Cover images : {COVERS_DIR}/")
+    if not args.no_covers:
+        print(f"  Cover images : {COVERS_DIR}/")
 
 
 if __name__ == "__main__":

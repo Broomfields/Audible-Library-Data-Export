@@ -53,7 +53,8 @@ You only need to run this once unless your tokens expire or you switch accounts.
 ### Step 2 — Export your library
 
 ```bash
-python fetch_library.py
+python fetch_library.py           # fetch metadata and download covers
+python fetch_library.py --no-covers  # fetch metadata only, skip image downloads
 ```
 
 This will:
@@ -81,11 +82,14 @@ A JSON array where each entry looks like:
     { "name": "Cosmere", "position": "17" }
   ],
   "categories": ["Science Fiction & Fantasy", "Fantasy"],
-  "cover_url": "https://m.media-amazon.com/images/I/..."
+  "cover_url": "https://m.media-amazon.com/images/I/...",
+  "cover_local": "covers/B08G9PRS1K.jpg"
 }
 ```
 
-`series` is an array of objects so books that belong to multiple series (e.g. a title that is part of both a sub-series and a wider universe) are fully represented. It will be an empty array for standalone books. Other fields may be `null` or empty lists when the information isn't available from Audible.
+`series` is an array of objects so books that belong to multiple series (e.g. a title that is part of both a sub-series and a wider universe) are fully represented. It will be an empty array for standalone books.
+
+`cover_local` is a path relative to `output/` pointing to the expected location of the downloaded cover image. It is always written when a `cover_url` is available, even if the image hasn't been downloaded yet — consumers should check that the file exists before using it. Other fields may be `null` or empty lists when the information isn't available from Audible.
 
 ### `output/covers/`
 
@@ -93,7 +97,7 @@ One image file per book, named `{ASIN}.jpg`. Already-downloaded files are skippe
 
 ### On ISBNs
 
-Audible does not expose ISBN numbers through its API. Each audiobook is identified by an **ASIN** (Amazon Standard Identification Number). You can reach any book's Amazon page directly at `https://www.amazon.com/dp/{ASIN}`.
+Audible does not expose ISBN numbers through its API. Each audiobook is identified by an **ASIN** (Amazon Standard Identification Number). The ASIN can be used to look a book up on Audible or Amazon, though the URL format varies by marketplace and some Audible-exclusive titles may not have a corresponding Amazon product page.
 
 ## What you can do with the output
 
