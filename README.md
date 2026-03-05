@@ -93,6 +93,36 @@ One image file per book, named `{ASIN}.jpg`. Already-downloaded files are skippe
 
 Audible does not expose ISBN numbers through its API. Each audiobook is identified by an **ASIN** (Amazon Standard Identification Number). You can reach any book's Amazon page directly at `https://www.amazon.com/dp/{ASIN}`.
 
+## What you can do with the output
+
+The honest origin of this project: I wanted cover art from my audiobook library so I could rank them in a tier list and send it to a friend. The scripts grew from there.
+
+The JSON and covers folder are intentionally plain so they're easy to pipe into whatever comes next. A few directions worth knowing about:
+
+### Browse and query with Datasette
+
+[Datasette](https://datasette.io/) is a great way to explore the data visually — filter by series, genre, narrator, run SQL against it — without writing any code. These are standalone CLI tools rather than project dependencies, so install them globally with [`pipx`](https://pipx.pypa.io/) rather than into the project venv. First convert the JSON to SQLite using [`sqlite-utils`](https://sqlite-utils.datasette.io/):
+
+```bash
+pipx install sqlite-utils datasette
+cd output
+sqlite-utils insert library.db library library.json --pk asin
+datasette library.db
+```
+
+Then open `http://127.0.0.1:8001` in your browser. To filter by genre across the JSON array field, use SQLite's `json_each`:
+
+```sql
+SELECT library.*
+FROM library, json_each(library.categories)
+WHERE series_position = '1'
+AND json_each.value = 'Science Fiction'
+```
+
+### Use it as a data source for a larger project
+
+The output is structured to be easy to ingest elsewhere — a reading tracker, a personal book database, a recommendation tool, or anything else that benefits from having clean metadata and local cover images. This project is intentionally just the data-extraction layer.
+
 ## Security
 
 - `auth/audible_auth.json` contains **OAuth tokens only** — not your Amazon password.
