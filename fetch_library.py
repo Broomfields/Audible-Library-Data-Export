@@ -99,14 +99,15 @@ def extract_book(item: dict) -> dict:
     authors = _names(item.get("authors", []))
     narrators = _names(item.get("narrators", []))
 
-    # --- Series (use the first entry if multiple) ---
-    series_name: str | None = None
-    series_position: str | None = None
-    series_list = item.get("series") or []
-    if series_list:
-        first = series_list[0]
-        series_name = first.get("title") or first.get("name") or None
-        series_position = first.get("sequence") or None
+    # --- Series (all entries; a book can belong to multiple series) ---
+    series: list[dict] = []
+    for s in item.get("series") or []:
+        name = s.get("title") or s.get("name") or None
+        if name:
+            series.append({
+                "name": name,
+                "position": s.get("sequence") or None,
+            })
 
     # --- Categories / genres ---
     # category_ladders is a list of {"ladder": [{"id": ..., "name": ...}, ...]}
@@ -130,8 +131,7 @@ def extract_book(item: dict) -> dict:
         "title": title,
         "authors": authors,
         "narrators": narrators,
-        "series_name": series_name,
-        "series_position": series_position,
+        "series": series,
         "categories": categories,
         "cover_url": cover_url,
     }

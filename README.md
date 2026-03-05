@@ -73,17 +73,19 @@ A JSON array where each entry looks like:
 ```json
 {
   "asin": "B08G9PRS1K",
-  "title": "Project Hail Mary",
-  "authors": ["Andy Weir"],
-  "narrators": ["Ray Porter"],
-  "series_name": null,
-  "series_position": null,
-  "categories": ["Science Fiction", "Adventure"],
+  "title": "The Final Empire",
+  "authors": ["Brandon Sanderson"],
+  "narrators": ["Michael Kramer"],
+  "series": [
+    { "name": "Mistborn Saga", "position": "1" },
+    { "name": "Cosmere", "position": "17" }
+  ],
+  "categories": ["Science Fiction & Fantasy", "Fantasy"],
   "cover_url": "https://m.media-amazon.com/images/I/..."
 }
 ```
 
-Fields may be `null` or empty lists when the information isn't available from Audible (e.g. series fields for standalone books).
+`series` is an array of objects so books that belong to multiple series (e.g. a title that is part of both a sub-series and a wider universe) are fully represented. It will be an empty array for standalone books. Other fields may be `null` or empty lists when the information isn't available from Audible.
 
 ### `output/covers/`
 
@@ -113,10 +115,23 @@ datasette library.db
 Then open `http://127.0.0.1:8001` in your browser. To filter by genre across the JSON array field, use SQLite's `json_each`:
 
 ```sql
+-- Books in a given genre
 SELECT library.*
-FROM library, json_each(library.categories)
-WHERE series_position = '1'
-AND json_each.value = 'Science Fiction'
+FROM library, json_each(library.categories) AS c
+WHERE c.value = 'Science Fiction & Fantasy';
+
+-- First book in every series by a specific author
+SELECT DISTINCT
+    library.title,
+    library.asin,
+    json_extract(s.value, '$.name')     AS series_name,
+    json_extract(s.value, '$.position') AS position
+FROM library,
+     json_each(library.series)  AS s,
+     json_each(library.authors) AS a
+WHERE a.value = 'Brandon Sanderson'
+AND   json_extract(s.value, '$.position') = '1'
+ORDER BY series_name;
 ```
 
 ### Use it as a data source for a larger project
